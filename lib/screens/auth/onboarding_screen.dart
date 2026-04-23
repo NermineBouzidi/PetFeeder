@@ -1,3 +1,4 @@
+import 'package:app/screens/auth/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
@@ -122,40 +123,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 },
               ),
 
-              // ── Diamond arrow — bleeds off right edge ───────────────────
-              Positioned(
-                right: -38,
-                bottom: 200,
-                child: GestureDetector(
-                  onTap: _nextPage,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 400),
-                    curve: Curves.easeInOut,
-                    child: Transform.rotate(
-                      angle: math.pi / 4,
-                      child: Container(
-                        width: 90,
-                        height: 90,
-                        decoration: BoxDecoration(
-                          color: page.accent,
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: Transform.rotate(
-                          angle: -math.pi / 4,
-                          child: Icon(
-                            _currentPage == _pages.length - 1
-                                ? Icons.check_rounded
-                                : Icons.arrow_forward_rounded,
-                            color: const Color(0xFF1A0F08),
-                            size: 26,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
+             
               // ── Bottom bar ───────────────────────────────────────────────
               Positioned(
                 bottom: 0,
@@ -177,8 +145,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                               height: 52,
                               child: ElevatedButton.icon(
                                 onPressed: () {
-                                  // TODO: navigate to email sign up
-                                },
+                                  Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen())) ;                               },
                                 icon: const Icon(Icons.mail_outline_rounded,
                                     size: 18),
                                 label: const Text('Continue with Email'),

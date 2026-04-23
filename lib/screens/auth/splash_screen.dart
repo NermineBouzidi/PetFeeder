@@ -184,7 +184,7 @@ class _SplashScreenState extends State<SplashScreen>
                             children: [
                               // Category label
                               Text(
-                                'Smart Pet Care  🐾',
+                                'Whisker  🐾',
                                 style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
