@@ -1,3 +1,7 @@
+import 'package:app/screens/auth/forgot_password_screen.dart';
+import 'package:app/screens/auth/register_screen.dart';
+import 'package:app/screens/home/home_screen.dart';
+import 'package:app/screens/home/main_shell.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
@@ -122,7 +126,7 @@ class _LoginScreenState extends State<LoginScreen>
                   alignment: Alignment.centerRight,
                   child: GestureDetector(
                     onTap: () {
-                      // TODO: navigate to ForgotPasswordScreen
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()));
                     },
                     child: Text(
                       'Forgot password?',
@@ -142,7 +146,7 @@ class _LoginScreenState extends State<LoginScreen>
                   height: 52,
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      // TODO: handle sign in
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const MainShell()));
                     },
                     icon: const Icon(Icons.login_rounded, size: 18),
                     label: const Text('Sign In'),
@@ -188,7 +192,7 @@ class _LoginScreenState extends State<LoginScreen>
                 Center(
                   child: GestureDetector(
                     onTap: () {
-                      // TODO: navigate to RegisterScreen
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen()));
                     },
                     child: RichText(
                       text: TextSpan(
