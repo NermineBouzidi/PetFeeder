@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 
 class RegisterScreen extends StatefulWidget {
@@ -44,6 +46,62 @@ static const _accent = Color(0xFFE8A87C);
       setState(() => _passwordsMatch = match);
     }
   }
+  Future<void> _register() async {
+  final email = _emailController.text.trim();
+  final password = _passwordController.text.trim();
+  final firstName = _firstNameController.text.trim();
+  final lastName = _lastNameController.text.trim();
+
+  if (email.isEmpty ||
+      password.isEmpty ||
+      firstName.isEmpty ||
+      lastName.isEmpty) {
+    _showError("Please fill all fields");
+    return;
+  }
+
+  if (!_passwordsMatch) {
+    _showError("Passwords do not match");
+    return;
+  }
+
+  try {
+    // 🔥 CREATE USER
+    UserCredential userCredential =
+        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+
+    String uid = userCredential.user!.uid;
+
+    // 🔥 SAVE DATA IN FIRESTORE
+    await FirebaseFirestore.instance.collection('users').doc(uid).set({
+      'firstName': firstName,
+      'lastName': lastName,
+      'email': email,
+      'createdAt': Timestamp.now(),
+    });
+
+    _showSuccess("Account created successfully!");
+
+  } on FirebaseAuthException catch (e) {
+    _showError(e.message ?? "Registration failed");
+  } catch (e) {
+    _showError("Something went wrong");
+  }
+}
+void _showError(String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(message), backgroundColor: Colors.red),
+  );
+}
+
+void _showSuccess(String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(message), backgroundColor: Colors.green),
+  );
+}
 
   @override
   void dispose() {
@@ -285,11 +343,7 @@ static const _accent = Color(0xFFE8A87C);
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton.icon(
-                    onPressed: _agreedToTerms
-                        ? () {
-                            // TODO: handle registration
-                          }
-                        : null,
+                    onPressed: _agreedToTerms ? _register : null,
                     icon: const Icon(Icons.person_add_rounded, size: 18),
                     label: const Text('Create Account'),
                     style: ElevatedButton.styleFrom(
