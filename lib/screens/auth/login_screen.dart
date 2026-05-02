@@ -4,6 +4,7 @@ import 'package:app/screens/home/home_screen.dart';
 import 'package:app/screens/home/main_shell.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -37,6 +38,46 @@ class _LoginScreenState extends State<LoginScreen>
     _passwordController.dispose();
     super.dispose();
   }
+  Future<void> _login() async {
+  final email = _emailController.text.trim();
+  final password = _passwordController.text.trim();
+
+  if (email.isEmpty || password.isEmpty) {
+    _showError("Please fill all fields");
+    return;
+  }
+
+  try {
+    await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+
+    _showSuccess("Login successful!");
+
+    // 👉 go to your main app
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const MainShell()),
+    );
+
+  } on FirebaseAuthException catch (e) {
+    _showError(e.message ?? "Login failed");
+  } catch (e) {
+    _showError("Something went wrong");
+  }
+}
+void _showError(String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(message), backgroundColor: Colors.red),
+  );
+}
+
+void _showSuccess(String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(message), backgroundColor: Colors.green),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -145,9 +186,7 @@ class _LoginScreenState extends State<LoginScreen>
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const MainShell()));
-                    },
+                    onPressed: _login,
                     icon: const Icon(Icons.login_rounded, size: 18),
                     label: const Text('Sign In'),
                     style: ElevatedButton.styleFrom(
