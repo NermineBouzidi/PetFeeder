@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
+
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 

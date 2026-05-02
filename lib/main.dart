@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'screens/auth/splash_screen.dart';
-void main() {
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized(); // 🔥 REQUIRED
+
+  await Firebase.initializeApp(); // 🔥 VERY IMPORTANT
+
   runApp(MyApp());
 }
 
@@ -8,7 +14,8 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: SplashScreen(), // 👈 THIS is what you need
+      debugShowCheckedModeBanner: false,
+      home: SplashScreen(),
     );
   }
 }
