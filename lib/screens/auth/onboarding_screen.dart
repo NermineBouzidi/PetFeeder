@@ -1,6 +1,8 @@
 import 'package:app/screens/auth/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -84,6 +86,35 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _contentController.forward();
   }
 
+
+Future<void> _signInWithGoogle() async {
+  try {
+    final GoogleSignIn googleSignIn = GoogleSignIn.instance;
+
+    await googleSignIn.initialize();
+
+    final GoogleSignInAccount? googleUser =
+        await googleSignIn.authenticate();
+
+    if (googleUser == null) return;
+
+    final googleAuth = googleUser.authentication;
+
+    final credential = GoogleAuthProvider.credential(
+      idToken: googleAuth.idToken,
+    );
+
+    await FirebaseAuth.instance.signInWithCredential(credential);
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
+  } catch (e) {
+    print("Google Sign-In Error: $e");
+  }
+}
+
   @override
   void dispose() {
     _bgController.dispose();
@@ -94,15 +125,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
-    final page = _pages[_currentPage];
-
+final page = _pages[_currentPage];
+final fixedAccent = _pages[0].accent; // 👈 ALWAYS FIRST COLOR
     return Scaffold(
       backgroundColor: const Color(0xFF141018),
       body: AnimatedBuilder(
         animation: _bgController,
         builder: (context, child) {
           return CustomPaint(
-            painter: _BlobPainter(_bgController.value, page.accent),
+painter: _BlobPainter(_bgController.value, fixedAccent),
             child: child,
           );
         },
@@ -173,7 +204,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                   child: _SocialButton(
                                     label: 'Google',
                                     icon: Icons.g_mobiledata_rounded,
-                                    onTap: () {},
+onTap: _signInWithGoogle,
                                   ),
                                 ),
                                 const SizedBox(width: 12),

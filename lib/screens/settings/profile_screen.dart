@@ -1,3 +1,5 @@
+import 'package:app/models/user_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
 import '../auth/login_screen.dart';
@@ -7,6 +9,8 @@ import './notification_settings_screen.dart';
 import './device_settings_screen.dart';
 import './device_setup_screen.dart';
 import '../settings/about_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:app/providers/user_provider.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -24,6 +28,8 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+      final user = context.watch<UserProvider>().user;  // ← add this
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -34,7 +40,7 @@ class ProfileScreen extends StatelessWidget {
             children: [
               _buildHeader(context),
               const SizedBox(height: 20),
-              _buildUserCard(context),
+              _buildUserCard(context, user),
               const SizedBox(height: 14),
               _buildStatsRow(),
               const SizedBox(height: 14),
@@ -171,8 +177,11 @@ class ProfileScreen extends StatelessWidget {
 
   // ── User card ────────────────────────────────────────────────────────────────
 
-  Widget _buildUserCard(BuildContext context) {
-    return Container(
+Widget _buildUserCard(BuildContext context, UserModel? user) {
+  final name = user?.fullName ?? 'Loading...';
+  final email = user?.email ?? '';
+  final initial = user != null ? user.firstName[0].toUpperCase() : '?'; 
+     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -194,7 +203,7 @@ class ProfileScreen extends StatelessWidget {
             ),
             child: Center(
               child: Text(
-                _userInitial,
+                initial,
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
@@ -210,13 +219,13 @@ class ProfileScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(_userName,
+                Text(name,
                     style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: Colors.white)),
                 const SizedBox(height: 2),
-                Text(_userEmail,
+                Text(email,
                     style: TextStyle(
                         fontSize: 12,
                         color: Colors.white.withOpacity(0.4))),
@@ -406,16 +415,15 @@ class ProfileScreen extends StatelessWidget {
                     color: Colors.white.withOpacity(0.5))),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: clear auth token from storage
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const LoginScreen()),
-                (_) => false,
-              );
-            },
+            onPressed: () async {
+  await FirebaseAuth.instance.signOut();
+  context.read<UserProvider>().clear(); // ← clear provider too
+  Navigator.pushAndRemoveUntil(
+    context,
+    MaterialPageRoute(builder: (_) => const LoginScreen()),
+    (_) => false,
+  );
+},
             child: const Text('Sign out',
                 style: TextStyle(color: Color(0xFFF87171))),
           ),

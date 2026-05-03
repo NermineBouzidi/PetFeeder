@@ -1,7 +1,8 @@
+// main_shell.dart
 import 'package:flutter/material.dart';
 import '../../widgets/bottom_nav_bar.dart';
 import '../home/home_screen.dart';
-import '../camera/live_camera_screen.dart';
+import '../pet/pet_screen.dart';        // ← changed
 import '../schedule/schedule_screen.dart';
 import '../settings/profile_screen.dart';
 
@@ -15,10 +16,9 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
-  // Keep all tabs alive when switching — no rebuilds
   final List<Widget> _tabs = const [
     HomeScreen(),
-    LiveCameraScreen(),
+    PetScreen(),           // ← changed
     ScheduleScreen(),
     ProfileScreen(),
   ];
@@ -33,7 +33,7 @@ class _MainShellState extends State<MainShell> {
       ),
       bottomNavigationBar: AppBottomNavBar(
         currentIndex: _currentIndex,
-        badgeIndices: const [2], // Schedule has a badge — remove when no alerts
+        badgeIndices: const [2],
         onTap: (i) => setState(() => _currentIndex = i),
       ),
     );

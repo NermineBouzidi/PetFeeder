@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import '../../providers/user_provider.dart';
+import '../setup/setup_screen.dart';
 
 
 class RegisterScreen extends StatefulWidget {
@@ -47,15 +50,13 @@ static const _accent = Color(0xFFE8A87C);
     }
   }
   Future<void> _register() async {
-  final email = _emailController.text.trim();
-  final password = _passwordController.text.trim();
+  final email     = _emailController.text.trim();
+  final password  = _passwordController.text.trim();
   final firstName = _firstNameController.text.trim();
-  final lastName = _lastNameController.text.trim();
+  final lastName  = _lastNameController.text.trim();
 
-  if (email.isEmpty ||
-      password.isEmpty ||
-      firstName.isEmpty ||
-      lastName.isEmpty) {
+  if (email.isEmpty || password.isEmpty ||
+      firstName.isEmpty || lastName.isEmpty) {
     _showError("Please fill all fields");
     return;
   }
@@ -66,24 +67,27 @@ static const _accent = Color(0xFFE8A87C);
   }
 
   try {
-    // 🔥 CREATE USER
-    UserCredential userCredential =
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
+    UserCredential userCredential = await FirebaseAuth.instance
+        .createUserWithEmailAndPassword(email: email, password: password);
 
     String uid = userCredential.user!.uid;
 
-    // 🔥 SAVE DATA IN FIRESTORE
     await FirebaseFirestore.instance.collection('users').doc(uid).set({
-      'firstName': firstName,
-      'lastName': lastName,
-      'email': email,
-      'createdAt': Timestamp.now(),
+      'firstName':      firstName,
+      'lastName':       lastName,
+      'email':          email,
+      'onboardingDone': false,    // ← important
+      'createdAt':      Timestamp.now(),
     });
 
-    _showSuccess("Account created successfully!");
+    await context.read<UserProvider>().loadUser(); // ← load into provider
+
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const SetupScreen()), // ← go to setup
+      );
+    }
 
   } on FirebaseAuthException catch (e) {
     _showError(e.message ?? "Registration failed");

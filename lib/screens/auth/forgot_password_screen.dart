@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -32,11 +33,23 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     super.dispose();
   }
 
-  void _sendResetLink() {
-    if (_emailController.text.trim().isEmpty) return;
-    setState(() => _sent = true);
-    // TODO: call your auth service here
+ Future<void> _sendResetLink() async {
+  if (_emailController.text.trim().isEmpty) return;
+
+  try {
+    await FirebaseAuth.instance.sendPasswordResetEmail(
+      email: _emailController.text.trim(),
+    );
+    setState(() => _sent = true); // shows the success state you already built
+  } on FirebaseAuthException catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(e.message ?? 'Something went wrong'),
+      backgroundColor: Colors.red,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ));
   }
+}
 
   @override
   Widget build(BuildContext context) {

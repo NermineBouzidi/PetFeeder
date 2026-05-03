@@ -5,6 +5,8 @@ import 'package:app/screens/home/main_shell.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';        // ← add at top
+import '../../providers/user_provider.dart';     // ← add at top
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -52,6 +54,8 @@ class _LoginScreenState extends State<LoginScreen>
       email: email,
       password: password,
     );
+        await context.read<UserProvider>().loadUser();
+
 
     _showSuccess("Login successful!");
 

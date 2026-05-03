@@ -1,4 +1,9 @@
+import 'package:app/models/pet_model.dart';
+import 'package:app/models/user_model.dart';
+import 'package:app/providers/user_provider.dart';
+import 'package:app/services/pet_service.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -9,15 +14,18 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // TODO: replace with real data from your providers
-  final String _userName = 'Karim';
-  final String _nextMealTime = '08:30 AM';
-  final String _nextMealCountdown = '1h 24min';
-  final int _nextMealGrams = 50;
-  final int _foodRemaining = 340;
-  final double _temperature = 24.0;
-  final int _humidity = 58;
-  final bool _cameraOnline = true;
+  final _petService = PetService();
+
+  // Static sensor data — replace with DeviceService later
+  final double _temperature    = 24.5;
+  final double _humidity       = 58.0;
+  final bool   _gasDetected    = false;
+  final bool   _motorOn        = true;
+
+  // Static meal data — replace with schedule data later
+  final String _nextMealTime      = '06:00 PM';
+  final String _nextMealCountdown = '2h 15min';
+  final int    _nextMealGrams     = 50;
 
   String _greeting() {
     final hour = DateTime.now().hour;
@@ -28,33 +36,42 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 20),
-              _buildNextMealCard(),
-              const SizedBox(height: 12),
-              _buildStatsGrid(),
-              const SizedBox(height: 12),
-              _buildTodaysMeals(),
-              const SizedBox(height: 12),
-              _buildPetCard(),
-            ],
+    final user = context.watch<UserProvider>().user;
+
+    return StreamBuilder<PetModel?>(
+      stream: _petService.petStream(),
+      builder: (context, petSnap) {
+        final pet = petSnap.data;
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(user),
+                  const SizedBox(height: 20),
+                  _buildNextMealCard(),
+                  const SizedBox(height: 12),
+                  _buildStatsGrid(),
+                  const SizedBox(height: 12),
+                  _buildTodaysMeals(),
+                  const SizedBox(height: 12),
+                  _buildPetCard(pet),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
   // ── Header ──────────────────────────────────────────────────────────────────
 
-  Widget _buildHeader() {
+  Widget _buildHeader(UserModel? user) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -73,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              '${_greeting()},\n$_userName 👋',
+              '${_greeting()},\n${user?.firstName ?? 'there'} 👋',
               style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
@@ -83,14 +100,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        // Notification bell
         Stack(
           clipBehavior: Clip.none,
           children: [
             GestureDetector(
-              onTap: () {
-                // TODO: navigate to NotificationsScreen
-              },
+              onTap: () {},
               child: Container(
                 width: 40,
                 height: 40,
@@ -104,7 +118,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: Colors.white.withOpacity(0.5), size: 18),
               ),
             ),
-            // Badge
             Positioned(
               top: -2,
               right: -2,
@@ -193,9 +206,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    // TODO: show FeedNowConfirmScreen or bottom sheet
-                  },
+                  onPressed: () {},
                   icon: const Icon(Icons.play_arrow_rounded, size: 16),
                   label: const Text('Feed Now'),
                   style: ElevatedButton.styleFrom(
@@ -213,9 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    // TODO: navigate to ScheduleScreen tab
-                  },
+                  onPressed: () {},
                   icon: Icon(Icons.calendar_month_outlined,
                       size: 15, color: Colors.white.withOpacity(0.6)),
                   label: Text('Schedule',
@@ -240,39 +249,41 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Stats 2x2 grid ───────────────────────────────────────────────────────────
+  // ── Stats grid ───────────────────────────────────────────────────────────────
 
   Widget _buildStatsGrid() {
     final stats = [
       _StatData(
-        label: 'Camera',
-        value: _cameraOnline ? 'Live' : 'Offline',
-        icon: Icons.videocam_outlined,
-        iconColor: const Color(0xFF7CB9E8),
-        badge: _cameraOnline ? Colors.greenAccent.shade400 : Colors.redAccent,
-        onTap: () {
-          // TODO: switch to camera tab
-        },
-      ),
-      _StatData(
-        label: 'Food remaining',
-        value: '${_foodRemaining}g',
-        icon: Icons.storage_outlined,
-        iconColor: AppColors.accent,
-        onTap: () {},
-      ),
-      _StatData(
         label: 'Temperature',
-        value: '${_temperature.toStringAsFixed(0)}°C',
+        value: '${_temperature.toStringAsFixed(1)}°C',
         icon: Icons.thermostat_outlined,
         iconColor: const Color(0xFF60a5fa),
         onTap: () {},
       ),
       _StatData(
         label: 'Humidity',
-        value: '$_humidity%',
+        value: '${_humidity.toStringAsFixed(0)}%',
         icon: Icons.water_drop_outlined,
         iconColor: const Color(0xFF6ee7b7),
+        onTap: () {},
+      ),
+      _StatData(
+        label: 'Gas',
+        value: _gasDetected ? 'Detected' : 'Normal',
+        icon: Icons.air_outlined,
+        iconColor:
+            _gasDetected ? Colors.redAccent : const Color(0xFFB07CE8),
+        badge: _gasDetected ? Colors.redAccent : null,
+        onTap: () {},
+      ),
+      _StatData(
+        label: 'Motor',
+        value: _motorOn ? 'En marche' : "À l'arrêt",
+        icon: Icons.settings_outlined,
+        iconColor: _motorOn
+            ? Colors.greenAccent.shade400
+            : Colors.white.withOpacity(0.3),
+        badge: _motorOn ? Colors.greenAccent.shade400 : null,
         onTap: () {},
       ),
     ];
@@ -288,15 +299,24 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Today's meals list ───────────────────────────────────────────────────────
+  // ── Today's meals ────────────────────────────────────────────────────────────
 
   Widget _buildTodaysMeals() {
     final meals = [
-      _MealLog(time: '07:00 AM', grams: 50, label: 'Morning meal',
+      _MealLog(
+          time: '07:00 AM',
+          grams: 50,
+          label: 'Morning meal',
           status: _MealStatus.delivered),
-      _MealLog(time: '08:30 AM', grams: 50, label: 'Midday meal',
+      _MealLog(
+          time: '12:00 PM',
+          grams: 50,
+          label: 'Midday meal',
           status: _MealStatus.upcoming),
-      _MealLog(time: '06:00 PM', grams: 50, label: 'Evening meal',
+      _MealLog(
+          time: '06:00 PM',
+          grams: 50,
+          label: 'Evening meal',
           status: _MealStatus.scheduled),
     ];
 
@@ -313,20 +333,15 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Today\'s meals',
+              const Text("Today's meals",
                   style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: Colors.white)),
-              GestureDetector(
-                onTap: () {
-                  // TODO: navigate to HistoryScreen
-                },
-                child: Text('See all',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.accent.withOpacity(0.8))),
-              ),
+              Text('See all',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.accent.withOpacity(0.8))),
             ],
           ),
           const SizedBox(height: 14),
@@ -338,67 +353,68 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ── Pet card ─────────────────────────────────────────────────────────────────
 
-  Widget _buildPetCard() {
-    return GestureDetector(
-      onTap: () {
-        // TODO: navigate to PetDetailScreen
-      },
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border:
-              Border.all(color: Colors.white.withOpacity(0.07), width: 1),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.accent.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                    color: AppColors.accent.withOpacity(0.2), width: 1),
-              ),
-              child: const Center(
-                  child: Text('🐱', style: TextStyle(fontSize: 22))),
+  Widget _buildPetCard(PetModel? pet) {
+    final name    = pet?.name    ?? 'Loading...';
+    final emoji   = pet?.emoji   ?? '🐾';
+    final species = pet?.species == 'dog' ? 'Dog' : 'Cat';
+    final weight  = pet != null  ? '${pet.weight}kg' : '--';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border:
+            Border.all(color: Colors.white.withOpacity(0.07), width: 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.accent.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: AppColors.accent.withOpacity(0.2), width: 1),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Luna',
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white)),
-                  Text('Persian · 3.2 kg · 2 years old',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.white.withOpacity(0.4))),
-                ],
-              ),
+            child: Center(
+              child: Text(emoji, style: const TextStyle(fontSize: 22)),
             ),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: Colors.greenAccent.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                    color: Colors.greenAccent.withOpacity(0.2), width: 1),
-              ),
-              child: const Text('Healthy',
-                  style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.greenAccent)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white)),
+                Text('$species · $weight',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.4))),
+              ],
             ),
-          ],
-        ),
+          ),
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.greenAccent.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                  color: Colors.greenAccent.withOpacity(0.2), width: 1),
+            ),
+            child: const Text('Healthy',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.greenAccent)),
+          ),
+        ],
       ),
     );
   }
@@ -437,8 +453,8 @@ class _StatCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-              color: Colors.white.withOpacity(0.07), width: 1),
+          border:
+              Border.all(color: Colors.white.withOpacity(0.07), width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -489,7 +505,7 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// ── Meal log tile ─────────────────────────────────────────────────────────────
+// ── Meal log ──────────────────────────────────────────────────────────────────
 
 enum _MealStatus { delivered, upcoming, scheduled }
 
@@ -498,11 +514,12 @@ class _MealLog {
   final int grams;
   final String label;
   final _MealStatus status;
-  const _MealLog(
-      {required this.time,
-      required this.grams,
-      required this.label,
-      required this.status});
+  const _MealLog({
+    required this.time,
+    required this.grams,
+    required this.label,
+    required this.status,
+  });
 }
 
 class _MealLogTile extends StatelessWidget {
@@ -512,7 +529,7 @@ class _MealLogTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDelivered = meal.status == _MealStatus.delivered;
-    final isUpcoming = meal.status == _MealStatus.upcoming;
+    final isUpcoming  = meal.status == _MealStatus.upcoming;
 
     final iconColor = isDelivered
         ? Colors.greenAccent.shade400
@@ -526,10 +543,6 @@ class _MealLogTile extends StatelessWidget {
             ? AppColors.accent.withOpacity(0.12)
             : Colors.white.withOpacity(0.05);
 
-    final icon = isDelivered
-        ? Icons.check_rounded
-        : Icons.access_time_rounded;
-
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
@@ -538,8 +551,15 @@ class _MealLogTile extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-                color: iconBg, borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, color: iconColor, size: 15),
+                color: iconBg,
+                borderRadius: BorderRadius.circular(10)),
+            child: Icon(
+              isDelivered
+                  ? Icons.check_rounded
+                  : Icons.access_time_rounded,
+              color: iconColor,
+              size: 15,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -554,12 +574,13 @@ class _MealLogTile extends StatelessWidget {
                             ? Colors.white
                             : Colors.white.withOpacity(0.4))),
                 Text(
-                    '${meal.time} · ${meal.grams}g · '
-                    '${isDelivered ? "Delivered" : isUpcoming ? "Upcoming" : "Scheduled"}',
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.white.withOpacity(
-                            isDelivered || isUpcoming ? 0.35 : 0.2))),
+                  '${meal.time} · ${meal.grams}g · '
+                  '${isDelivered ? "Delivered" : isUpcoming ? "Upcoming" : "Scheduled"}',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.white.withOpacity(
+                          isDelivered || isUpcoming ? 0.35 : 0.2)),
+                ),
               ],
             ),
           ),

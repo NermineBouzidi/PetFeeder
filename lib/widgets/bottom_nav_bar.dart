@@ -14,11 +14,11 @@ class AppBottomNavBar extends StatelessWidget {
   });
 
   static const _items = [
-    _NavItem(label: 'Home',     icon: Icons.home_outlined,           activeIcon: Icons.home_rounded),
-    _NavItem(label: 'Camera',   icon: Icons.videocam_outlined,       activeIcon: Icons.videocam_rounded),
-    _NavItem(label: 'Schedule', icon: Icons.calendar_month_outlined, activeIcon: Icons.calendar_month_rounded),
-    _NavItem(label: 'Profile',  icon: Icons.person_outline_rounded,  activeIcon: Icons.person_rounded),
-  ];
+  _NavItem(label: 'Home',     icon: Icons.home_outlined,          activeIcon: Icons.home_rounded),
+  _NavItem(label: 'Pet',      icon: Icons.pets_outlined,          activeIcon: Icons.pets_rounded),  // ← changed
+  _NavItem(label: 'Schedule', icon: Icons.calendar_month_outlined,activeIcon: Icons.calendar_month_rounded),
+  _NavItem(label: 'Profile',  icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded),
+];
 
   @override
   Widget build(BuildContext context) {
