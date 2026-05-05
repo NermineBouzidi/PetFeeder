@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:app/services/schedule_service.dart';
+import 'package:http/http.dart' as http;
 import 'package:app/models/pet_model.dart';
 import 'package:app/models/user_model.dart';
 import 'package:app/providers/user_provider.dart';
@@ -6,6 +9,25 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DeviceService  (inline so the parsing is guaranteed correct)
+// ─────────────────────────────────────────────────────────────────────────────
+class DeviceService {
+  final String baseUrl = 'http://172.20.10.2:3001/api/state';
+
+  Future<Map<String, dynamic>> fetchData() async {
+    final response = await http.get(Uri.parse(baseUrl));
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to load data: ${response.statusCode}');
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HomeScreen
+// ─────────────────────────────────────────────────────────────────────────────
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -14,19 +36,94 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _petService = PetService();
+  final _petService    = PetService();
+  final _deviceService = DeviceService();
+  final _scheduleService = ScheduleService();
 
-  // Static sensor data — replace with DeviceService later
-  final double _temperature    = 24.5;
-  final double _humidity       = 58.0;
-  final bool   _gasDetected    = false;
-  final bool   _motorOn        = true;
+  // ── Device state ────────────────────────────────────────────────────────────
+  double? _temperature;
+  String  _temperatureUnit = 'C';
+  double? _humidity;
+  String  _humidityUnit    = '%';
+  bool    _gasDetected     = false;
+  String  _gasStatus       = 'normal';
+  bool    _motorOn         = false;
+  bool    _loading         = true;
+  String? _error;
 
-  // Static meal data — replace with schedule data later
+  // ── Static meal data ─────────────────────────────────────────────────────────
   final String _nextMealTime      = '06:00 PM';
   final String _nextMealCountdown = '2h 15min';
   final int    _nextMealGrams     = 50;
 
+  // ── Lifecycle ────────────────────────────────────────────────────────────────
+  @override
+  void initState() {
+    super.initState();
+    _startFetching();
+  }
+
+  void _startFetching() async {
+    while (mounted) {
+      try {
+        final data = await _deviceService.fetchData();
+
+        /*
+          Expected JSON shape:
+          {
+            "temperature": { "value": 29.75, "unit": "C" },
+            "humidity":    { "value": 49.5,  "unit": "%" },
+            "gas":         { "raw": 55, "mv": 44, "status": "normal" },
+            "motor":       { "running": false },
+            "lastUpdate":  "2026-05-05T15:47:09.867Z"
+          }
+        */
+
+        final tempMap  = data['temperature'] as Map<String, dynamic>?;
+        final humMap   = data['humidity']    as Map<String, dynamic>?;
+        final gasMap   = data['gas']         as Map<String, dynamic>?;
+        final motorMap = data['motor']       as Map<String, dynamic>?;
+
+        if (mounted) {
+          setState(() {
+            _loading = false;
+            _error   = null;
+
+            if (tempMap != null) {
+              _temperature     = (tempMap['value'] as num).toDouble();
+              _temperatureUnit = tempMap['unit'] as String? ?? 'C';
+            }
+
+            if (humMap != null) {
+              _humidity     = (humMap['value'] as num).toDouble();
+              _humidityUnit = humMap['unit'] as String? ?? '%';
+            }
+
+            if (gasMap != null) {
+              _gasStatus  = (gasMap['status'] as String? ?? 'normal').toLowerCase();
+              _gasDetected = _gasStatus != 'normal';
+            }
+
+            if (motorMap != null) {
+              _motorOn = motorMap['running'] as bool? ?? false;
+            }
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _loading = false;
+            _error   = e.toString();
+          });
+        }
+        debugPrint('DeviceService error: $e');
+      }
+
+      await Future.delayed(const Duration(seconds: 2));
+    }
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
   String _greeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) return 'Good morning';
@@ -34,6 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return 'Good evening';
   }
 
+  // ── Build ────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final user = context.watch<UserProvider>().user;
@@ -55,6 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 20),
                   _buildNextMealCard(),
                   const SizedBox(height: 12),
+                  if (_error != null) _buildErrorBanner(),
                   _buildStatsGrid(),
                   const SizedBox(height: 12),
                   _buildTodaysMeals(),
@@ -69,8 +168,35 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Header ──────────────────────────────────────────────────────────────────
+  // ── Error banner ─────────────────────────────────────────────────────────────
+  Widget _buildErrorBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.redAccent.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.wifi_off_rounded, color: Colors.redAccent, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Cannot reach device – showing last known values',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.redAccent.withOpacity(0.9),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
+  // ── Header ────────────────────────────────────────────────────────────────────
   Widget _buildHeader(UserModel? user) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -127,8 +253,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.accent,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                      color: AppColors.background, width: 1.5),
+                  border:
+                      Border.all(color: AppColors.background, width: 1.5),
                 ),
               ),
             ),
@@ -138,8 +264,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Next meal card ───────────────────────────────────────────────────────────
-
+  // ── Next meal card ────────────────────────────────────────────────────────────
   Widget _buildNextMealCard() {
     return Container(
       padding: const EdgeInsets.all(18),
@@ -206,7 +331,25 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () {},
+                  onPressed: _loading
+    ? null
+    : () async {
+        try {
+          await _scheduleService.feedNow();
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Feeding triggered successfully 🐾'),
+            ),
+          );
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to feed: $e'),
+            ),
+          );
+        }
+      }, 
                   icon: const Icon(Icons.play_arrow_rounded, size: 16),
                   label: const Text('Feed Now'),
                   style: ElevatedButton.styleFrom(
@@ -249,36 +392,50 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Stats grid ───────────────────────────────────────────────────────────────
-
+  // ── Stats grid ────────────────────────────────────────────────────────────────
   Widget _buildStatsGrid() {
+    // While loading show skeleton placeholders
+    final tempValue = _loading
+        ? '…'
+        : _temperature != null
+            ? '${_temperature!.toStringAsFixed(1)}°$_temperatureUnit'
+            : '--';
+
+    final humValue = _loading
+        ? '…'
+        : _humidity != null
+            ? '${_humidity!.toStringAsFixed(0)}$_humidityUnit'
+            : '--';
+
+    final gasValue  = _loading ? '…' : (_gasDetected ? 'Détecté' : 'Normal');
+    final motorValue = _loading ? '…' : (_motorOn ? 'En marche' : 'À l\'arrêt');
+
     final stats = [
       _StatData(
-        label: 'Temperature',
-        value: '${_temperature.toStringAsFixed(1)}°C',
+        label: 'Température',
+        value: tempValue,
         icon: Icons.thermostat_outlined,
         iconColor: const Color(0xFF60a5fa),
         onTap: () {},
       ),
       _StatData(
-        label: 'Humidity',
-        value: '${_humidity.toStringAsFixed(0)}%',
+        label: 'Humidité',
+        value: humValue,
         icon: Icons.water_drop_outlined,
         iconColor: const Color(0xFF6ee7b7),
         onTap: () {},
       ),
       _StatData(
-        label: 'Gas',
-        value: _gasDetected ? 'Detected' : 'Normal',
+        label: 'Gaz',
+        value: gasValue,
         icon: Icons.air_outlined,
-        iconColor:
-            _gasDetected ? Colors.redAccent : const Color(0xFFB07CE8),
+        iconColor: _gasDetected ? Colors.redAccent : const Color(0xFFB07CE8),
         badge: _gasDetected ? Colors.redAccent : null,
         onTap: () {},
       ),
       _StatData(
-        label: 'Motor',
-        value: _motorOn ? 'En marche' : "À l'arrêt",
+        label: 'Moteur',
+        value: motorValue,
         icon: Icons.settings_outlined,
         iconColor: _motorOn
             ? Colors.greenAccent.shade400
@@ -299,8 +456,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Today's meals ────────────────────────────────────────────────────────────
-
+  // ── Today's meals ─────────────────────────────────────────────────────────────
   Widget _buildTodaysMeals() {
     final meals = [
       _MealLog(
@@ -351,8 +507,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Pet card ─────────────────────────────────────────────────────────────────
-
+  // ── Pet card ──────────────────────────────────────────────────────────────────
   Widget _buildPetCard(PetModel? pet) {
     final name    = pet?.name    ?? 'Loading...';
     final emoji   = pet?.emoji   ?? '🐾';
@@ -421,7 +576,6 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
-
 class _StatData {
   final String label;
   final String value;
@@ -470,7 +624,8 @@ class _StatCard extends StatelessWidget {
                     color: data.iconColor.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(data.icon, color: data.iconColor, size: 16),
+                  child:
+                      Icon(data.icon, color: data.iconColor, size: 16),
                 ),
                 if (data.badge != null)
                   Container(
@@ -506,7 +661,6 @@ class _StatCard extends StatelessWidget {
 }
 
 // ── Meal log ──────────────────────────────────────────────────────────────────
-
 enum _MealStatus { delivered, upcoming, scheduled }
 
 class _MealLog {

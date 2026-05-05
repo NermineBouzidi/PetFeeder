@@ -1,66 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
 import '../schedule/add_schedule_screen.dart';
-
-// ── Data model ────────────────────────────────────────────────────────────────
-
-enum ScheduleFilter { all, active, paused }
-
-class ScheduleModel {
-  final String id;
-  final String label;
-  final TimeOfDay time;
-  final int grams;
-  final List<int> days; // 1=Mon ... 7=Sun
-  bool isActive;
-
-  ScheduleModel({
-    required this.id,
-    required this.label,
-    required this.time,
-    required this.grams,
-    required this.days,
-    this.isActive = true,
-  });
-
-  String get formattedTime {
-    final h = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
-    final m = time.minute.toString().padLeft(2, '0');
-    final period = time.period == DayPeriod.am ? 'AM' : 'PM';
-    return '$h:$m $period';
-  }
-
-  String get daysLabel {
-    const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    if (days.length == 7) return 'Everyday';
-    return days.map((d) => names[d - 1]).join(', ');
-  }
-
-  String get nextOccurrence {
-    if (!isActive) return 'Paused';
-    final now = DateTime.now();
-    final todayIndex = now.weekday; // 1=Mon
-    // Find next day
-    for (int offset = 0; offset < 8; offset++) {
-      final checkDay = ((todayIndex - 1 + offset) % 7) + 1;
-      if (days.contains(checkDay)) {
-        if (offset == 0) {
-          final nowMinutes = now.hour * 60 + now.minute;
-          final schedMinutes = time.hour * 60 + time.minute;
-          if (schedMinutes > nowMinutes) return 'Today';
-        } else if (offset == 1) {
-          return 'Tomorrow';
-        } else {
-          const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-          return names[checkDay - 1];
-        }
-      }
-    }
-    return 'N/A';
-  }
-}
+import '../../services/schedule_service.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
+
+enum ScheduleFilter { all, active, paused }
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -72,41 +17,28 @@ class ScheduleScreen extends StatefulWidget {
 class _ScheduleScreenState extends State<ScheduleScreen> {
   ScheduleFilter _filter = ScheduleFilter.all;
 
-  // TODO: replace with real data from ScheduleProvider
-  final List<ScheduleModel> _schedules = [
-    ScheduleModel(
-      id: '1',
-      label: 'Morning meal',
-      time: const TimeOfDay(hour: 7, minute: 0),
-      grams: 50,
-      days: [1, 2, 3, 4, 5, 6, 7],
-      isActive: true,
-    ),
-    ScheduleModel(
-      id: '2',
-      label: 'Midday meal',
-      time: const TimeOfDay(hour: 12, minute: 30),
-      grams: 40,
-      days: [1, 3, 5],
-      isActive: true,
-    ),
-    ScheduleModel(
-      id: '3',
-      label: 'Evening meal',
-      time: const TimeOfDay(hour: 18, minute: 0),
-      grams: 50,
-      days: [1, 2, 3, 4, 5, 6, 7],
-      isActive: false,
-    ),
-    ScheduleModel(
-      id: '4',
-      label: 'Night snack',
-      time: const TimeOfDay(hour: 21, minute: 0),
-      grams: 20,
-      days: [6, 7],
-      isActive: true,
-    ),
-  ];
+  final ScheduleService _service = ScheduleService();
+
+  List<ScheduleModel> _schedules = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSchedules();
+  }
+
+  Future<void> _loadSchedules() async {
+    try {
+      final data = await _service.fetchAll();
+      setState(() {
+        _schedules = data;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() => _loading = false);
+    }
+  }
 
   List<ScheduleModel> get _filtered {
     switch (_filter) {
@@ -120,20 +52,20 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   int get _totalGramsToday {
-    final today = DateTime.now().weekday;
+    final today = DateTime.now().weekday % 7;
     return _schedules
         .where((s) => s.isActive && s.days.contains(today))
         .fold(0, (sum, s) => sum + s.grams);
   }
 
-  void _toggleSchedule(ScheduleModel s) {
+  void _toggleSchedule(ScheduleModel s) async {
     setState(() => s.isActive = !s.isActive);
-    // TODO: push toggle to MQTT / backend
+    await _service.update(s);
   }
 
-  void _deleteSchedule(ScheduleModel s) {
+  void _deleteSchedule(ScheduleModel s) async {
     setState(() => _schedules.removeWhere((e) => e.id == s.id));
-    // TODO: delete from backend
+    await _service.delete(int.parse(s.id.toString()));
   }
 
   void _navigateToAdd() async {
@@ -141,6 +73,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       context,
       MaterialPageRoute(builder: (_) => const AddScheduleScreen()),
     );
+
     if (result != null && result is ScheduleModel) {
       setState(() => _schedules.add(result));
     }
@@ -150,8 +83,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-          builder: (_) => AddScheduleScreen(existing: s)),
+        builder: (_) => AddScheduleScreen(existing: s),
+      ),
     );
+
     if (result != null && result is ScheduleModel) {
       setState(() {
         final idx = _schedules.indexWhere((e) => e.id == result.id);
