@@ -6,10 +6,13 @@ import 'providers/user_provider.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/setup/setup_screen.dart';
 import 'screens/home/main_shell.dart';
+import 'services/notification_service.dart';          // ← ADD
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  await NotificationService().init();                 // ← ADD
+  await NotificationService().requestPermission();    // ← ADD
   runApp(
     ChangeNotifierProvider(
       create: (_) => UserProvider(),
@@ -18,6 +21,7 @@ void main() async {
   );
 }
 
+// Everything below stays exactly the same
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -38,34 +42,22 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-
-        // Still connecting
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SplashScreen();
         }
-
-        // ✅ Not logged in → your normal splash/onboarding/login flow
         if (!snapshot.hasData) {
           return const SplashScreen();
         }
-
-        // Logged in → check if setup done
         return FutureBuilder(
           future: context.read<UserProvider>().loadUser(),
           builder: (context, userSnap) {
-
             if (userSnap.connectionState == ConnectionState.waiting) {
               return const SplashScreen();
             }
-
             final user = context.watch<UserProvider>().user;
-
-            // Setup not done → SetupScreen
             if (user == null || !user.onboardingDone) {
               return const SetupScreen();
             }
-
-            // All good → Home
             return const MainShell();
           },
         );

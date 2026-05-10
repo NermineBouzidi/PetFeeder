@@ -1,3 +1,4 @@
+import 'package:app/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
 import '../schedule/add_schedule_screen.dart';
@@ -61,11 +62,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   void _toggleSchedule(ScheduleModel s) async {
     setState(() => s.isActive = !s.isActive);
     await _service.update(s);
+      await NotificationService().rescheduleForSchedule(s); // ← add this
+
   }
 
   void _deleteSchedule(ScheduleModel s) async {
     setState(() => _schedules.removeWhere((e) => e.id == s.id));
     await _service.delete(int.parse(s.id.toString()));
+      await NotificationService().cancelAllForSchedule(s.id!); // ← add this
+
   }
 
   void _navigateToAdd() async {

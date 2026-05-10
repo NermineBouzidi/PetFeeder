@@ -120,12 +120,60 @@ String? get _uid => _auth.currentUser?.uid;
   };
 
   // GET /api/schedule
-  Future<List<ScheduleModel>> fetchAll() async {
+Future<List<ScheduleModel>> fetchAll() async {
+  try {
+    // 1️⃣ Try local server first (STM32 source of truth)
     final res = await http.get(Uri.parse('$_base/api/schedule'));
-    if (res.statusCode != 200) throw Exception('fetchAll failed: ${res.statusCode}');
-    final list = jsonDecode(res.body) as List;
-    return list.map((j) => ScheduleModel.fromJson(j as Map<String, dynamic>)).toList();
+    if (res.statusCode == 200) {
+      final list = jsonDecode(res.body) as List;
+      final serverSchedules = list
+          .map((j) => ScheduleModel.fromJson(j as Map<String, dynamic>))
+          .toList();
+
+      // 2️⃣ If server has schedules, return them
+      if (serverSchedules.isNotEmpty) return serverSchedules;
+
+      // 3️⃣ Server is empty (probably restarted) → restore from Firebase
+      if (_uid != null) {
+        final snapshot = await _firestore
+            .collection('users')
+            .doc(_uid)
+            .collection('schedules')
+            .get();
+
+        if (snapshot.docs.isEmpty) return [];
+
+        final firebaseSchedules = snapshot.docs
+            .map((doc) => ScheduleModel.fromJson(doc.data()))
+            .toList();
+
+        // 4️⃣ Re-push each schedule back to the server so STM32/cron works again
+        for (final s in firebaseSchedules) {
+          await http.post(
+            Uri.parse('$_base/api/schedule'),
+            headers: _headers,
+            body: jsonEncode(s.toJson()),
+          );
+        }
+
+        return firebaseSchedules;
+      }
+    }
+  } catch (e) {
+    // Server unreachable → read from Firebase only
+    if (_uid != null) {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(_uid)
+          .collection('schedules')
+          .get();
+      return snapshot.docs
+          .map((doc) => ScheduleModel.fromJson(doc.data()))
+          .toList();
+    }
   }
+  return [];
+}
 
   // POST /api/schedule
  Future<ScheduleModel> create(ScheduleModel s) async {

@@ -1,3 +1,4 @@
+import 'package:app/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
 import '../../services/schedule_service.dart'; // ← adjust path if needed
@@ -120,6 +121,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
           ? await _service.update(draft)
           : await _service.create(draft);
 
+      await NotificationService().rescheduleForSchedule(saved);
       if (mounted) Navigator.pop(context, saved);
     } catch (e) {
       setState(() {
